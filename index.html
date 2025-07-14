@@ -1,0 +1,195 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8">
+  <title>Premedica-Medicina | Malla Interactiva</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <style>
+    body { font-family: Arial, sans-serif; margin: 20px; background: #f4f8fb;}
+    .header { text-align: center; margin-bottom: 30px;}
+    .titulo { font-size: 2.4em; font-weight: bold; color: #2b539a;}
+    .subtitulo { font-size: 1.6em; color: #2b539a; margin-top: 6px;}
+    .uasd { font-size: 1em; color: #2b539a; opacity: 0.7; margin-bottom: 16px;}
+    .semestre { margin-bottom: 34px; background: #e7f1fb; border-radius: 10px; padding: 18px 10px; box-shadow: 0 2px 8px #0001; max-width: 420px; margin-left: auto; margin-right: auto;}
+    .semestre h2 { color: #2980b9; margin-bottom: 14px; text-align: center;}
+    .materia { display: flex; align-items: center; margin-bottom: 9px; border-radius: 7px; padding: 8px 4px; transition: background 0.2s;}
+    .materia input[type="checkbox"] { margin-right: 12px; accent-color: #218143; width: 20px; height: 20px;}
+    .materia label { flex: 1; font-size: 1.04em; cursor: pointer; transition: color 0.2s;}
+    .materia.locked label { color: #aaa; cursor: not-allowed;}
+    .materia:not(.locked):hover { background: #b7e1f7;}
+    .materia.aprobada { background: linear-gradient(90deg, #54d36a 70%, #aef1b9 100%);}
+    .creditos { font-size: 0.94em; color: #666; margin-left: 18px;}
+    #clave-modal-bg {
+      position: fixed; top:0; left:0; width:100vw; height:100vh; background:rgba(0,0,0,0.3);
+      display:none; align-items:center; justify-content:center; z-index:10;
+    }
+    #clave-modal {
+      background: #fff; padding: 28px 18px; border-radius: 15px; box-shadow: 0 1px 16px #0003;
+      text-align: center; min-width: 260px;
+    }
+    #clave-modal input { font-size: 1.15em; padding: 7px; border-radius: 7px; border: 1px solid #2980b9; margin-top: 10px;}
+    #clave-modal button { margin-top: 16px; font-size: 1.1em; padding: 7px 22px; background: #2980b9; color: #fff; border: none; border-radius: 7px; cursor: pointer;}
+    #clave-error { color: #c00; margin-top: 10px; font-size: 1.06em;}
+  </style>
+</head>
+<body>
+  <div class="header">
+    <div class="titulo">Premedica-Medicina</div>
+    <div class="subtitulo">MANAURI AYBAR</div>
+    <div class="uasd">UASD</div>
+  </div>
+  <div id="malla"></div>
+
+  <!-- Modal de clave -->
+  <div id="clave-modal-bg">
+    <div id="clave-modal">
+      <h3>🔒 Ingresa la clave para modificar</h3>
+      <input id="clave-input" type="password" placeholder="Clave">
+      <div id="clave-error"></div>
+      <button id="clave-btn">Aceptar</button>
+    </div>
+  </div>
+
+  <script>
+  // Cambia esta clave por la que tú quieras
+  const CLAVE = "uasd2025";
+  let claveCorrecta = false;
+  let pendingCheckbox = null;
+
+  // --- Materias y prerrequisitos ---
+  const materias = [
+    // Semestre 1
+    { clave: "BIO-0170", nombre: "Biología Básica", semestre: 1, prereq: [] },
+    { clave: "BIO-0180", nombre: "Laboratorio Biología Básica", semestre: 1, prereq: [] },
+    { clave: "DOP-1000", nombre: "Orientación Institucional", semestre: 1, prereq: [] },
+    { clave: "FIL-0110", nombre: "Int A La Filosofía", semestre: 1, prereq: [] },
+    { clave: "LET-0110", nombre: "Lengua Española Básica I", semestre: 1, prereq: [] },
+    { clave: "MAT-0140", nombre: "Matemática Básica", semestre: 1, prereq: [] },
+    { clave: "QUI-0140", nombre: "Química Básica", semestre: 1, prereq: [] },
+    { clave: "SOC-0100", nombre: "Introd A Las Ciencias Sociales", semestre: 1, prereq: [] },
+    { clave: "FIS-0140", nombre: "Física Básica", semestre: 1, prereq: [] },
+    { clave: "FIS-0200", nombre: "Laboratorio de Física", semestre: 1, prereq: ["FIS-0140"] },
+
+    // Semestre 2
+    { clave: "CFI-3150", nombre: "Biofísica", semestre: 2, prereq: ["FIS-0140", "FIS-0200", "BIO-0170", "BIO-0180"] },
+    { clave: "CFI-3160", nombre: "Lab Biofísica", semestre: 2, prereq: ["FIS-0140", "FIS-0200", "BIO-0170", "BIO-0180"] },
+    { clave: "EFS-0120", nombre: "Educación Física", semestre: 2, prereq: [] },
+    { clave: "HIS-0110", nombre: "Fund De His Social Dominicana", semestre: 2, prereq: [] },
+    { clave: "LET-0120", nombre: "Lengua Española Básica II", semestre: 2, prereq: ["LET-0110"] },
+    { clave: "OSI-1510", nombre: "Fund De Desarrollo Cognitivo", semestre: 2, prereq: [] },
+    { clave: "QUI-1220", nombre: "Química Orgánica", semestre: 2, prereq: ["QUI-0140"] },
+    { clave: "SOC-1470", nombre: "Vida en Comunidad", semestre: 2, prereq: ["SOC-0100"] },
+
+    // Semestre 3
+    { clave: "CMO-1020", nombre: "Estructuras y Sist Anatómicos", semestre: 3, prereq: ["BIO-0170", "BIO-0180"] },
+    { clave: "CMO-1030", nombre: "Lab Estruct y Sist Anatómicos", semestre: 3, prereq: ["BIO-0170", "BIO-0180"] },
+    { clave: "SAP-2090", nombre: "Bases para el Anal Biométrico", semestre: 3, prereq: ["MAT-0140"] },
+    { clave: "INF-1030", nombre: "Introducción A La Informática", semestre: 3, prereq: ["MAT-0140"] },
+    { clave: "IDI-1200", nombre: "Inglés Técnico en Salud I", semestre: 3, prereq: [] },
+    { clave: "HIS-2370", nombre: "Hist de la Cultura Universal", semestre: 3, prereq: ["HIS-0110"] },
+    { clave: "HIS-1700", nombre: "Antrop Aplicada en Medicina", semestre: 3, prereq: [] },
+    { clave: "FIL-1270", nombre: "Fundamentos Ética Gral", semestre: 3, prereq: ["FIL-0110"] },
+
+    // Semestre 4
+    { clave: "CMO-0300", nombre: "Bases Hist del Organismo", semestre: 4, prereq: ["BIO-0170", "BIO-0180"] },
+    { clave: "CMO-0340", nombre: "Lab Bases Hist del Organismo", semestre: 4, prereq: ["BIO-0170", "BIO-0180"] },
+    { clave: "CFI-0160", nombre: "Fisiología Celular", semestre: 4, prereq: ["QUI-1220", "BIO-0170", "BIO-0180", "CFI-3150"] },
+    { clave: "SAP-2080", nombre: "Tecn Inform E Invest en Salud", semestre: 4, prereq: ["INF-1030"] },
+    { clave: "IDI-1270", nombre: "Inglés Técnico en Salud II", semestre: 4, prereq: ["IDI-1200"] },
+    { clave: "INF-1320", nombre: "Sist de Soporte Vital Básico", semestre: 4, prereq: ["CMO-1020", "CMO-1030"] },
+    { clave: "SAP-1520", nombre: "Int A La Med Invest Cient", semestre: 4, prereq: ["FIL-0110", "SOC-0100", "MAT-0140"] },
+    { clave: "MEED-0330", nombre: "Salud y Conducta Humana", semestre: 4, prereq: [] },
+    { clave: "MEED-0340", nombre: "Salud y Conducta Humana", semestre: 4, prereq: ["SOC-0100"] }
+  ];
+
+  // Estado de materias aprobadas con persistencia local
+  let aprobadas = {};
+  const STORAGE_KEY = "premedica-medicina-aprobadas";
+
+  function loadAprobadas() {
+    try {
+      const data = localStorage.getItem(STORAGE_KEY);
+      aprobadas = data ? JSON.parse(data) : {};
+    } catch(e) { aprobadas = {}; }
+  }
+  function saveAprobadas() {
+    localStorage.setItem(STORAGE_KEY, JSON.stringify(aprobadas));
+  }
+
+  // Modal de clave
+  function showClaveModal(onSuccess) {
+    document.getElementById('clave-modal-bg').style.display = "flex";
+    document.getElementById('clave-input').value = "";
+    document.getElementById('clave-error').innerText = "";
+    document.getElementById('clave-input').focus();
+    // Botón aceptar
+    document.getElementById('clave-btn').onclick = function() {
+      let valor = document.getElementById('clave-input').value;
+      if(valor === CLAVE) {
+        claveCorrecta = true;
+        document.getElementById('clave-modal-bg').style.display = "none";
+        if(onSuccess) onSuccess();
+      } else {
+        document.getElementById('clave-error').innerText = "Clave incorrecta";
+        claveCorrecta = false;
+      }
+    };
+    // Enter para aceptar
+    document.getElementById('clave-input').addEventListener('keypress', function(e){
+      if(e.key === "Enter") document.getElementById('clave-btn').click();
+    });
+  }
+
+  function renderMalla() {
+    const container = document.getElementById('malla');
+    container.innerHTML = '';
+    for (let s = 1; s <= 4; s++) {
+      const sem = materias.filter(m => m.semestre === s);
+      const divSem = document.createElement('div');
+      divSem.className = 'semestre';
+      divSem.innerHTML = `<h2>Semestre ${s}</h2>`;
+      sem.forEach(materia => {
+        const unlocked = materia.prereq.every(c => aprobadas[c]);
+        const divMat = document.createElement('div');
+        divMat.className = 'materia' + (unlocked ? '' : ' locked') + (aprobadas[materia.clave] ? ' aprobada' : '');
+        const check = document.createElement('input');
+        check.type = 'checkbox';
+        check.disabled = !unlocked;
+        check.checked = !!aprobadas[materia.clave];
+        check.onmousedown = function(e) {
+          // Solo pide clave si aún no se ha ingresado
+          if (!claveCorrecta) {
+            e.preventDefault();
+            pendingCheckbox = check;
+            showClaveModal(function(){
+              // Una vez ingresada la clave correcta, activa el checkbox
+              pendingCheckbox.checked = !pendingCheckbox.checked;
+              aprobadas[materia.clave] = pendingCheckbox.checked;
+              saveAprobadas();
+              renderMalla();
+            });
+          }
+        };
+        check.onchange = function() {
+          if (claveCorrecta) {
+            aprobadas[materia.clave] = check.checked;
+            saveAprobadas();
+            renderMalla();
+          }
+        };
+        const label = document.createElement('label');
+        label.textContent = `${materia.nombre} (${materia.clave})`;
+        divMat.appendChild(check);
+        divMat.appendChild(label);
+        divSem.appendChild(divMat);
+      });
+      container.appendChild(divSem);
+    }
+  }
+
+  // Inicializar
+  loadAprobadas();
+  renderMalla();
+  </script>
+</body>
+</html>
